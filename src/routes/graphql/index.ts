@@ -1,7 +1,7 @@
 import { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { createGqlResponseSchema, gqlResponseSchema } from './schemas.js';
-import { graphql } from 'graphql';
-
+import {graphql, GraphQLList, GraphQLObjectType, GraphQLSchema, GraphQLString} from 'graphql';
+import { PrismaClient, User } from '@prisma/client';
 const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
   const { prisma } = fastify;
 
@@ -15,9 +15,37 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
       },
     },
     async handler(req) {
-      // return graphql();
+       return graphql({
+           schema,
+           source: req.body.query,
+           variableValues: req.body.variables,
+           contextValue: { prisma: fastify.prisma }}
+       );
     },
   });
 };
-
+const schema = new GraphQLSchema({
+  query: new GraphQLObjectType({
+    name:'RootQuery',
+    fields: {
+        users: {
+            type: new GraphQLList(GraphQLString), // упрощённо: список строк
+            resolve: async (
+                _parent: unknown,
+                _args: unknown,
+                context: { prisma: PrismaClient }
+            ) => {
+                const users = await context.prisma.user.findMany();
+                return users.map((u) => u.name);
+            }
+        },
+      testString: {
+        type: GraphQLString,
+        resolve: async ()=>{
+          return "Hello world";
+        }
+      }
+    }
+  })
+})
 export default plugin;
